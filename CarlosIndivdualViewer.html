@@ -223,6 +223,8 @@
 
   <!-- Only the Upload modal remains now -->
   <button class="add-button" onclick="openUploadModal()">+</button>
+
+  <!-- Upload Modal -->
   <div id="upload-modal" class="modal">
     <div class="modal-content">
       <h2 class="modal-title">Upload 3D Model</h2>
@@ -251,7 +253,36 @@
     </div>
   </div>
 
-  <!-- View Modal -->
+  <!-- Transfer Ownership Modal -->
+  <div id="transfer-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">Transfer Ownership</h2>
+      <span class="close-button" onclick="closeTransferModal()">&times;</span>
+      <form id="transfer-form">
+        <div class="form-group">
+          <label for="target-wallet">Target Wallet Address:</label>
+          <input type="text" id="target-wallet" placeholder="Enter target wallet address" required>
+        </div>
+        <div class="form-group">
+          <label for="latest-scan-file">Upload Latest Scan (Optional):</label>
+          <input type="file" id="latest-scan-file" accept="image/*,application/pdf">
+        </div>
+        <div class="form-group">
+          <label for="scan-code">Or Enter Scan Code:</label>
+          <input type="text" id="scan-code" placeholder="Enter scan code">
+        </div>
+        <!-- Hidden fields for item info -->
+        <input type="hidden" id="transfer-item-cid">
+        <input type="hidden" id="transfer-item-name">
+        <div class="form-actions">
+          <button type="button" class="btn" style="background-color: #ddd; color: #333;" onclick="closeTransferModal()">Cancel</button>
+          <button type="submit" class="btn">Transfer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- View Modal (now without AR or transfer buttons) -->
   <div id="view-modal" class="modal">
     <div class="modal-content" style="max-width: 800px; height: 80vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
       <span class="close-button" style="z-index: 10; color: white; text-shadow: 0 0 3px black;" onclick="closeViewModal()">&times;</span>
@@ -260,7 +291,6 @@
                       style="width: 100%; height: 100%;"
                       camera-controls
                       auto-rotate
-                      ar
                       shadow-intensity="1">
         </model-viewer>
       </div>
@@ -268,10 +298,6 @@
         <h2 id="detail-title">Model Title</h2>
         <p id="detail-date" class="item-date">Created: </p>
         <div id="model-format-info" style="font-size: 14px; color: #666; margin-bottom: 10px;"></div>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button class="btn" id="ar-view-btn" onclick="triggerARView()">View in AR</button>
-          <button class="btn" id="transfer-btn">Transfer Ownership</button>
-        </div>
       </div>
     </div>
   </div>
@@ -285,15 +311,12 @@
 
     // Global function to automatically convert a USDZ file to GLB.
     async function convertUSDZFile(cid, filename) {
-      // Fetch the USDZ file from Pinata
       const response = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
       if (!response.ok) throw new Error("Failed to fetch USDZ file.");
       const usdzBlob = await response.blob();
-      // Create a File object (the MIME type may vary based on your conversion service)
       const usdzFile = new File([usdzBlob], filename, { type: 'model/vnd.usdz+zip' });
       const formData = new FormData();
       formData.append('file', usdzFile);
-      // Send to the local conversion service
       const convResponse = await fetch(conversionServiceURL, {
         method: 'POST',
         body: formData
@@ -303,20 +326,30 @@
         throw new Error(`Conversion failed: ${errorData.error || convResponse.statusText}`);
       }
       const convertedBlob = await convResponse.blob();
-      // Create a URL for the converted GLB blob so it can be rendered
       return URL.createObjectURL(convertedBlob);
     }
 
-    // Initialize when the DOM content is loaded
     document.addEventListener('DOMContentLoaded', () => {
       fetchInventoryItems();
       document.getElementById('upload-form').addEventListener('submit', (e) => {
         e.preventDefault();
         uploadModel();
       });
+      document.getElementById('transfer-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const targetWallet = document.getElementById('target-wallet').value;
+        const latestScanFile = document.getElementById('latest-scan-file').files[0];
+        const scanCode = document.getElementById('scan-code').value;
+        const itemCid = document.getElementById('transfer-item-cid').value;
+        const itemName = document.getElementById('transfer-item-name').value;
+        console.log("Transfer Ownership Request:", {
+          targetWallet, latestScanFile, scanCode, itemCid, itemName
+        });
+        alert("Transfer Ownership request submitted.");
+        closeTransferModal();
+      });
     });
 
-    // Fetch inventory items from Pinata
     async function fetchInventoryItems() {
       try {
         const response = await fetch(PINATA_PUBLIC_URL, {
@@ -325,7 +358,6 @@
         });
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
         const data = await response.json();
-        // Filter for GLB, GLTF, and USDZ files
         const modelFiles = data.data.files.filter(file =>
           file.name.toLowerCase().endsWith('.glb') ||
           file.name.toLowerCase().endsWith('.gltf') ||
@@ -341,19 +373,15 @@
       }
     }
 
-    // Determine if the file is web compatible (GLB or GLTF)
     function isWebCompatible(filename) {
       return filename.toLowerCase().endsWith('.glb') || filename.toLowerCase().endsWith('.gltf');
     }
 
-    // Get file extension in uppercase
     function getFileFormat(filename) {
       const parts = filename.split('.');
       return parts[parts.length - 1].toUpperCase();
     }
 
-    // Render inventory items in the page.
-    // USDZ files are automatically converted and then rendered.
     function renderInventoryItems(items) {
       const container = document.getElementById('inventory-container');
       container.innerHTML = '';
@@ -368,7 +396,6 @@
         const card = document.createElement('div');
         card.className = 'item-card';
 
-        // If the file is GLB/GLTF, render directly.
         if (isWebCompatible(item.name)) {
           card.innerHTML = `
             <div class="model-container">
@@ -386,14 +413,14 @@
             <div class="item-info">
               <h3>${item.name.split('.')[0]}</h3>
               <div class="item-date">Created: ${formattedDate}</div>
-              <button class="btn" onclick="viewModel('https://gateway.pinata.cloud/ipfs/${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', '${fileFormat}', true)">View Details</button>
+              <div style="display: flex; gap: 10px;">
+                <button class="btn" onclick="viewModel('https://gateway.pinata.cloud/ipfs/${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', '${fileFormat}', true)">View Details</button>
+                <button class="btn" onclick="openTransferModal('${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', '${fileFormat}')">Transfer Ownership</button>
+              </div>
             </div>
           `;
           container.appendChild(card);
-        }
-        // If the file is USDZ, automatically convert it.
-        else if (item.name.toLowerCase().endsWith('.usdz')) {
-          // Initial placeholder while conversion is in progress.
+        } else if (item.name.toLowerCase().endsWith('.usdz')) {
           card.innerHTML = `
             <div class="model-container">
               <div class="placeholder-model" data-cid="${item.cid}">
@@ -409,7 +436,6 @@
             </div>
           `;
           container.appendChild(card);
-          // Begin automatic conversion.
           convertUSDZFile(item.cid, item.name).then(convertedURL => {
             card.innerHTML = `
               <div class="model-container">
@@ -427,7 +453,10 @@
               <div class="item-info">
                 <h3>${item.name.split('.')[0]}</h3>
                 <div class="item-date">Created: ${formattedDate}</div>
-                <button class="btn" onclick="viewModel('${convertedURL}', '${item.name.split('.')[0]}', '${formattedDate}', 'GLB', true)">View Details</button>
+                <div style="display: flex; gap: 10px;">
+                  <button class="btn" onclick="viewModel('${convertedURL}', '${item.name.split('.')[0]}', '${formattedDate}', 'GLB', true)">View Details</button>
+                  <button class="btn" onclick="openTransferModal('${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', 'GLB')">Transfer Ownership</button>
+                </div>
               </div>
             `;
           }).catch(error => {
@@ -448,7 +477,6 @@
       });
     }
 
-    // Open and close the upload modal
     function openUploadModal() {
       document.getElementById('upload-modal').style.display = 'flex';
     }
@@ -457,15 +485,13 @@
       document.getElementById('upload-form').reset();
     }
 
-    // Modified viewModel accepts the model source (either from Pinata or the converted blob URL)
+    // The view modal now only shows the model details.
     function viewModel(modelSrc, name, date, format, isCompatible) {
       const modelViewer = document.getElementById('detail-model-viewer');
-      const arButton = document.getElementById('ar-view-btn');
       const formatInfo = document.getElementById('model-format-info');
       if (isCompatible) {
         modelViewer.src = modelSrc;
         modelViewer.setAttribute('alt', name);
-        arButton.style.display = 'block';
         formatInfo.textContent = `Format: ${format} (Web Compatible)`;
       } else {
         modelViewer.removeAttribute('src');
@@ -476,7 +502,6 @@
               <div style="font-size: 16px; margin-top: 10px;">Conversion required</div>
             </div>
           </div>`;
-        arButton.style.display = 'none';
         formatInfo.textContent = `Format: ${format} (Conversion required)`;
       }
       document.getElementById('detail-title').textContent = name;
@@ -486,56 +511,15 @@
     function closeViewModal() {
       document.getElementById('view-modal').style.display = 'none';
     }
-    function triggerARView() {
-      const modelViewer = document.getElementById('detail-model-viewer');
-      modelViewer.activateAR();
-    }
 
-    // Upload GLB/GLTF model to Pinata
-    async function uploadModel() {
-      const fileInput = document.getElementById('model-file');
-      const nameInput = document.getElementById('model-name');
-      const descriptionInput = document.getElementById('model-description');
-      if (!fileInput.files || fileInput.files.length === 0) {
-        alert('Please select a file to upload');
-        return;
-      }
-      const file = fileInput.files[0];
-      const name = nameInput.value;
-      const description = descriptionInput.value || '';
-      const fileName = file.name.toLowerCase();
-      if (!fileName.endsWith('.glb') && !fileName.endsWith('.gltf')) {
-        alert('Please select a GLB or GLTF file for web compatibility');
-        return;
-      }
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('network', 'public');
-      const fileExtension = fileName.split('.').pop();
-      const finalName = name.endsWith(`.${fileExtension}`) ? name : `${name}.${fileExtension}`;
-      formData.append('name', finalName);
-      if (description) formData.append('description', description);
-      const submitButton = document.querySelector('#upload-form .btn[type="submit"]');
-      const originalText = submitButton.textContent;
-      submitButton.textContent = 'Uploading...';
-      submitButton.disabled = true;
-      try {
-        const response = await fetch(PINATA_UPLOAD_URL, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${pinataJWT}` },
-          body: formData
-        });
-        if (!response.ok) throw new Error(`Upload failed with status: ${response.status}`);
-        const result = await response.json();
-        console.log('Upload successful:', result);
-        closeUploadModal();
-        fetchInventoryItems();
-      } catch (error) {
-        console.error('Error uploading model:', error);
-        alert(`Upload failed: ${error.message}`);
-        submitButton.textContent = originalText;
-        submitButton.disabled = false;
-      }
+    function openTransferModal(cid, name, date, format) {
+      document.getElementById('transfer-item-cid').value = cid;
+      document.getElementById('transfer-item-name').value = name;
+      document.getElementById('transfer-modal').style.display = 'flex';
+    }
+    function closeTransferModal() {
+      document.getElementById('transfer-modal').style.display = 'none';
+      document.getElementById('transfer-form').reset();
     }
   </script>
 </body>
