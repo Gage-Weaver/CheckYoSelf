@@ -11,7 +11,7 @@ import SwiftUI
 struct CheckYoSelfApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NavigationStack { ContentView() }
         }
     }
 }
