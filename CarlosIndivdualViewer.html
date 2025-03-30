@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CheckYoSelf - My Inventory</title>
+  <!-- Model-viewer for 3D rendering -->
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #4285f4;
+      --secondary-color: #f4f4f9;
+      --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      --border-radius: 10px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      text-align: center;
+      background-color: var(--secondary-color);
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+    .header {
+      background-color: white;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      position: relative;
+    }
+    h1 {
+      margin: 0;
+      color: #333;
+    }
+    .inventory-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      margin: 30px auto;
+      max-width: 1200px;
+      padding: 0 20px;
+    }
+    .item-card {
+      background-color: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--card-shadow);
+      width: 280px;
+      overflow: hidden;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .item-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    }
+    .model-container {
+      width: 100%;
+      height: 280px;
+      background-color: #f8f8f8;
+      position: relative;
+    }
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      --poster-color: transparent;
+    }
+    .item-info {
+      padding: 15px;
+      text-align: left;
+    }
+    .item-info h3 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+    .item-date {
+      color: #777;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .btn {
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 0.2s;
+    }
+    .btn:hover {
+      background-color: #3367d6;
+    }
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 300px;
+      font-size: 18px;
+      color: #777;
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top: 4px solid var(--primary-color);
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .add-button {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background-color: var(--primary-color);
+      color: white;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 30px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+      border: none;
+    }
+    .add-button:hover {
+      transform: scale(1.1);
+      background-color: #3367d6;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+    .modal-content {
+      background-color: white;
+      padding: 25px;
+      border-radius: var(--border-radius);
+      max-width: 500px;
+      width: 90%;
+      position: relative;
+    }
+    .modal-title {
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+    .close-button {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #777;
+    }
+    .form-group {
+      margin-bottom: 15px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    .form-group input, .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+    .form-actions button {
+      margin-left: 10px;
+    }
+    .placeholder-model {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #f0f0f0;
+      color: #999;
+    }
+    .file-format-notice {
+      background-color: #fff3cd;
+      padding: 10px 15px;
+      border-radius: 4px;
+      margin-top: 10px;
+      border-left: 4px solid #ffc107;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>CheckYoSelf</h1>
+  </div>
+
+  <div id="inventory-loading" class="loading">
+    <div class="spinner"></div>
+    <span>Loading your inventory...</span>
+  </div>
+
+  <div id="inventory-container" class="inventory-container" style="display: none;">
+    <!-- Items will be populated here via JavaScript -->
+  </div>
+
+  <!-- Only the Upload modal remains now -->
+  <button class="add-button" onclick="openUploadModal()">+</button>
+  <div id="upload-modal" class="modal">
+    <div class="modal-content">
+      <h2 class="modal-title">Upload 3D Model</h2>
+      <span class="close-button" onclick="closeUploadModal()">&times;</span>
+      <form id="upload-form">
+        <div class="form-group">
+          <label for="model-file">Select 3D Model File:</label>
+          <input type="file" id="model-file" accept=".glb,.gltf" required>
+          <div class="file-format-notice">
+            <strong>Note:</strong> Upload GLB or GLTF files directly for best web compatibility.
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="model-name">Name:</label>
+          <input type="text" id="model-name" placeholder="Give your model a name" required>
+        </div>
+        <div class="form-group">
+          <label for="model-description">Description:</label>
+          <textarea id="model-description" placeholder="Describe your model" rows="3"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn" style="background-color: #ddd; color: #333;" onclick="closeUploadModal()">Cancel</button>
+          <button type="submit" class="btn">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- View Modal -->
+  <div id="view-modal" class="modal">
+    <div class="modal-content" style="max-width: 800px; height: 80vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+      <span class="close-button" style="z-index: 10; color: white; text-shadow: 0 0 3px black;" onclick="closeViewModal()">&times;</span>
+      <div style="flex-grow: 1; position: relative;">
+        <model-viewer id="detail-model-viewer"
+                      style="width: 100%; height: 100%;"
+                      camera-controls
+                      auto-rotate
+                      ar
+                      shadow-intensity="1">
+        </model-viewer>
+      </div>
+      <div style="padding: 20px; background: white;">
+        <h2 id="detail-title">Model Title</h2>
+        <p id="detail-date" class="item-date">Created: </p>
+        <div id="model-format-info" style="font-size: 14px; color: #666; margin-bottom: 10px;"></div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="btn" id="ar-view-btn" onclick="triggerARView()">View in AR</button>
+          <button class="btn" id="transfer-btn">Transfer Ownership</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Set your endpoints and JWT here
+    const pinataJWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIwMTE2ZDMwNS1iZmRhLTQ5Y2YtYTVmMi0wMDM0ZGFhODJjNjgiLCJlbWFpbCI6ImdhZ2Vfd2VhdmVyQGt1LmVkdSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiIyZmQzNDkxZTQ2NmI5NGFkOWIxMCIsInNjb3BlZEtleVNlY3JldCI6ImE4NmRiZDM4NGM2MWYwMWNlMjI3MTYwZjA1YTA5NzAwMTM3MWU3NmE1YWQ1MDgxZTc3ZGFlNjkyNTNjZmUxY2QiLCJleHAiOjE3NzQ4NTE2NjB9.A-kRdbtlKNzWrwmz8XYwoNSGBWIrLZ4ljvqu_rWEa20";
+    const PINATA_PUBLIC_URL = "https://api.pinata.cloud/v3/files/public";
+    const PINATA_UPLOAD_URL = "https://uploads.pinata.cloud/v3/files";
+    const conversionServiceURL = "http://localhost:6969/api/convert";
+
+    // Global function to automatically convert a USDZ file to GLB.
+    async function convertUSDZFile(cid, filename) {
+      // Fetch the USDZ file from Pinata
+      const response = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
+      if (!response.ok) throw new Error("Failed to fetch USDZ file.");
+      const usdzBlob = await response.blob();
+      // Create a File object (the MIME type may vary based on your conversion service)
+      const usdzFile = new File([usdzBlob], filename, { type: 'model/vnd.usdz+zip' });
+      const formData = new FormData();
+      formData.append('file', usdzFile);
+      // Send to the local conversion service
+      const convResponse = await fetch(conversionServiceURL, {
+        method: 'POST',
+        body: formData
+      });
+      if (!convResponse.ok) {
+        const errorData = await convResponse.json();
+        throw new Error(`Conversion failed: ${errorData.error || convResponse.statusText}`);
+      }
+      const convertedBlob = await convResponse.blob();
+      // Create a URL for the converted GLB blob so it can be rendered
+      return URL.createObjectURL(convertedBlob);
+    }
+
+    // Initialize when the DOM content is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchInventoryItems();
+      document.getElementById('upload-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        uploadModel();
+      });
+    });
+
+    // Fetch inventory items from Pinata
+    async function fetchInventoryItems() {
+      try {
+        const response = await fetch(PINATA_PUBLIC_URL, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${pinataJWT}` }
+        });
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const data = await response.json();
+        // Filter for GLB, GLTF, and USDZ files
+        const modelFiles = data.data.files.filter(file =>
+          file.name.toLowerCase().endsWith('.glb') ||
+          file.name.toLowerCase().endsWith('.gltf') ||
+          file.name.toLowerCase().endsWith('.usdz')
+        );
+        renderInventoryItems(modelFiles);
+        document.getElementById('inventory-loading').style.display = 'none';
+        document.getElementById('inventory-container').style.display = 'flex';
+      } catch (error) {
+        console.error('Error fetching inventory items:', error);
+        document.getElementById('inventory-loading').innerHTML =
+          `<p>Error loading inventory. Please try again later.<br>${error.message}</p>`;
+      }
+    }
+
+    // Determine if the file is web compatible (GLB or GLTF)
+    function isWebCompatible(filename) {
+      return filename.toLowerCase().endsWith('.glb') || filename.toLowerCase().endsWith('.gltf');
+    }
+
+    // Get file extension in uppercase
+    function getFileFormat(filename) {
+      const parts = filename.split('.');
+      return parts[parts.length - 1].toUpperCase();
+    }
+
+    // Render inventory items in the page.
+    // USDZ files are automatically converted and then rendered.
+    function renderInventoryItems(items) {
+      const container = document.getElementById('inventory-container');
+      container.innerHTML = '';
+      if (items.length === 0) {
+        container.innerHTML = '<p>No 3D models found in your inventory. Click the + button to upload your first model!</p>';
+        return;
+      }
+      items.forEach(item => {
+        const createdDate = new Date(item.created_at);
+        const formattedDate = createdDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        const fileFormat = getFileFormat(item.name);
+        const card = document.createElement('div');
+        card.className = 'item-card';
+
+        // If the file is GLB/GLTF, render directly.
+        if (isWebCompatible(item.name)) {
+          card.innerHTML = `
+            <div class="model-container">
+              <model-viewer
+                src="https://gateway.pinata.cloud/ipfs/${item.cid}"
+                alt="${item.name}"
+                camera-controls
+                auto-rotate
+                data-cid="${item.cid}"
+                data-name="${item.name}"
+                data-date="${formattedDate}"
+                data-format="${fileFormat}">
+              </model-viewer>
+            </div>
+            <div class="item-info">
+              <h3>${item.name.split('.')[0]}</h3>
+              <div class="item-date">Created: ${formattedDate}</div>
+              <button class="btn" onclick="viewModel('https://gateway.pinata.cloud/ipfs/${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', '${fileFormat}', true)">View Details</button>
+            </div>
+          `;
+          container.appendChild(card);
+        }
+        // If the file is USDZ, automatically convert it.
+        else if (item.name.toLowerCase().endsWith('.usdz')) {
+          // Initial placeholder while conversion is in progress.
+          card.innerHTML = `
+            <div class="model-container">
+              <div class="placeholder-model" data-cid="${item.cid}">
+                <div>
+                  <div class="spinner" style="margin-bottom:10px;"></div>
+                  <div>Converting USDZ to GLB...</div>
+                </div>
+              </div>
+            </div>
+            <div class="item-info">
+              <h3>${item.name.split('.')[0]}</h3>
+              <div class="item-date">Created: ${formattedDate}</div>
+            </div>
+          `;
+          container.appendChild(card);
+          // Begin automatic conversion.
+          convertUSDZFile(item.cid, item.name).then(convertedURL => {
+            card.innerHTML = `
+              <div class="model-container">
+                <model-viewer
+                  src="${convertedURL}"
+                  alt="${item.name}"
+                  camera-controls
+                  auto-rotate
+                  data-cid="${item.cid}"
+                  data-name="${item.name}"
+                  data-date="${formattedDate}"
+                  data-format="GLB">
+                </model-viewer>
+              </div>
+              <div class="item-info">
+                <h3>${item.name.split('.')[0]}</h3>
+                <div class="item-date">Created: ${formattedDate}</div>
+                <button class="btn" onclick="viewModel('${convertedURL}', '${item.name.split('.')[0]}', '${formattedDate}', 'GLB', true)">View Details</button>
+              </div>
+            `;
+          }).catch(error => {
+            card.innerHTML = `
+              <div class="model-container">
+                <div class="placeholder-model">
+                  <div style="color: red;">Conversion Error</div>
+                </div>
+              </div>
+              <div class="item-info">
+                <h3>${item.name.split('.')[0]}</h3>
+                <div class="item-date">Created: ${formattedDate}</div>
+              </div>
+            `;
+            console.error('Error converting USDZ:', error);
+          });
+        }
+      });
+    }
+
+    // Open and close the upload modal
+    function openUploadModal() {
+      document.getElementById('upload-modal').style.display = 'flex';
+    }
+    function closeUploadModal() {
+      document.getElementById('upload-modal').style.display = 'none';
+      document.getElementById('upload-form').reset();
+    }
+
+    // Modified viewModel accepts the model source (either from Pinata or the converted blob URL)
+    function viewModel(modelSrc, name, date, format, isCompatible) {
+      const modelViewer = document.getElementById('detail-model-viewer');
+      const arButton = document.getElementById('ar-view-btn');
+      const formatInfo = document.getElementById('model-format-info');
+      if (isCompatible) {
+        modelViewer.src = modelSrc;
+        modelViewer.setAttribute('alt', name);
+        arButton.style.display = 'block';
+        formatInfo.textContent = `Format: ${format} (Web Compatible)`;
+      } else {
+        modelViewer.removeAttribute('src');
+        modelViewer.innerHTML = `<div class="placeholder-model" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0;">
+            <div>
+              <div style="font-size: 64px; margin-bottom: 20px;">📦</div>
+              <div style="font-size: 20px;">${format} File</div>
+              <div style="font-size: 16px; margin-top: 10px;">Conversion required</div>
+            </div>
+          </div>`;
+        arButton.style.display = 'none';
+        formatInfo.textContent = `Format: ${format} (Conversion required)`;
+      }
+      document.getElementById('detail-title').textContent = name;
+      document.getElementById('detail-date').textContent = `Created: ${date}`;
+      document.getElementById('view-modal').style.display = 'flex';
+    }
+    function closeViewModal() {
+      document.getElementById('view-modal').style.display = 'none';
+    }
+    function triggerARView() {
+      const modelViewer = document.getElementById('detail-model-viewer');
+      modelViewer.activateAR();
+    }
+
+    // Upload GLB/GLTF model to Pinata
+    async function uploadModel() {
+      const fileInput = document.getElementById('model-file');
+      const nameInput = document.getElementById('model-name');
+      const descriptionInput = document.getElementById('model-description');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a file to upload');
+        return;
+      }
+      const file = fileInput.files[0];
+      const name = nameInput.value;
+      const description = descriptionInput.value || '';
+      const fileName = file.name.toLowerCase();
+      if (!fileName.endsWith('.glb') && !fileName.endsWith('.gltf')) {
+        alert('Please select a GLB or GLTF file for web compatibility');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('network', 'public');
+      const fileExtension = fileName.split('.').pop();
+      const finalName = name.endsWith(`.${fileExtension}`) ? name : `${name}.${fileExtension}`;
+      formData.append('name', finalName);
+      if (description) formData.append('description', description);
+      const submitButton = document.querySelector('#upload-form .btn[type="submit"]');
+      const originalText = submitButton.textContent;
+      submitButton.textContent = 'Uploading...';
+      submitButton.disabled = true;
+      try {
+        const response = await fetch(PINATA_UPLOAD_URL, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${pinataJWT}` },
+          body: formData
+        });
+        if (!response.ok) throw new Error(`Upload failed with status: ${response.status}`);
+        const result = await response.json();
+        console.log('Upload successful:', result);
+        closeUploadModal();
+        fetchInventoryItems();
+      } catch (error) {
+        console.error('Error uploading model:', error);
+        alert(`Upload failed: ${error.message}`);
+        submitButton.textContent = originalText;
+        submitButton.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
