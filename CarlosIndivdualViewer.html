@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Check Yo Self</title>
+  <title>CheckYoSelf</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/viem@1.0.0/dist/viem.min.js"></script>
   <style>
@@ -268,7 +268,7 @@
 </head>
 <body>
   <div class="header">
-    <h1>Check Yo Self</h1>
+    <h1>CheckYoSelf</h1>
     <button id="wallet-button" class="wallet-btn">Connect Wallet</button>
   </div>
 
@@ -618,7 +618,7 @@
           ...file,
           name: modelData ? modelData.name : file.name.split('.')[1],
           description: modelData ? modelData.description : '',
-          owner: modelData ? modelData.currentOwner : 'Unknown',
+          owner: modelData ? modelData.currentOwner : '0xfC5296986351E629BF97Ad68714F9575a07B82A3',
           createdAt: modelData ? new Date(Number(modelData.createdAt) * 1000) : new Date(file.created_at),
           modelId: modelData ? modelData.id : null
         };
@@ -968,48 +968,46 @@ async function convertUSDZFile(cid, filename) {
   console.log(`Starting conversion for ${filename} (CID: ${cid})`);
 
   try {
-    // 1. First fetch the USDZ file from IPFS
     const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
     console.log(`Fetching from IPFS: ${ipfsUrl}`);
 
     const response = await fetch(ipfsUrl);
-    if (!response.ok) {
-      throw new Error(`IPFS fetch failed with status ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`IPFS fetch failed with status ${response.status}`);
 
     console.log(`Successfully fetched USDZ file`);
     const usdzBlob = await response.blob();
-    const usdzFile = new File([usdzBlob], filename, { type: 'model/vnd.usdz+zip' });
 
-    // 2. Prepare form data for conversion
+    // Ensure the filename has .usdz extension
+    const fixedFilename = filename.toLowerCase().endsWith('.usdz') ? filename : `${filename}.usdz`;
+    const usdzFile = new File([usdzBlob], fixedFilename, {
+      type: 'model/vnd.usdz+zip',
+      lastModified: Date.now()
+    });
+
     const formData = new FormData();
-    formData.append('file', usdzFile);
-    console.log(`Prepared form data for conversion`);
+    formData.append('file', usdzFile, fixedFilename); // Explicitly set filename
+    console.log(`Prepared form data for conversion with filename: ${fixedFilename}`);
 
-    // 3. Try local conversion service
-    console.log(`Attempting conversion via ${conversionServiceURL}`);
     const convResponse = await fetch(conversionServiceURL, {
       method: 'POST',
       body: formData
     });
 
     if (!convResponse.ok) {
-      const errorText = await convResponse.text();
-      throw new Error(`Conversion failed: ${errorText}`);
+      const errorData = await convResponse.json();
+      throw new Error(`Conversion failed: ${JSON.stringify(errorData)}`);
     }
 
-    console.log(`Conversion successful`);
     const convertedBlob = await convResponse.blob();
-    const objectUrl = URL.createObjectURL(convertedBlob);
-    console.log(`Created object URL: ${objectUrl}`);
-
-    return objectUrl;
+    return URL.createObjectURL(convertedBlob);
 
   } catch (error) {
     console.error('Error in convertUSDZFile:', error);
-    throw error; // Re-throw to be caught by the caller
+    throw error;
   }
 }
+
+
   </script>
 </body>
 </html>
