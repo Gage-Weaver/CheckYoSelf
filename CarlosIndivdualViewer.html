@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CheckYoSelf - My Inventory</title>
-  <!-- Model-viewer for 3D rendering -->
+  <title>Check Yo Self</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-  <!-- Add Viem for blockchain interactions -->
   <script src="https://cdn.jsdelivr.net/npm/viem@1.0.0/dist/viem.min.js"></script>
   <style>
     :root {
@@ -258,11 +256,19 @@
     .transaction-item:last-child {
       border-bottom: none;
     }
+    .admin-badge {
+      background-color: #ff9800;
+      color: white;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      margin-left: 5px;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>CheckYoSelf</h1>
+    <h1>Check Yo Self</h1>
     <button id="wallet-button" class="wallet-btn">Connect Wallet</button>
   </div>
 
@@ -280,7 +286,7 @@
 
   <div id="upload-modal" class="modal">
     <div class="modal-content">
-      <h2 class="modal-title">Upload 3D Model</h2>
+      <h2 class="modal-title">Add 3D Model</h2>
       <span class="close-button" onclick="closeUploadModal()">&times;</span>
       <div id="upload-error" class="error-message" style="display: none;"></div>
       <form id="upload-form">
@@ -301,13 +307,13 @@
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
-          <button type="submit" class="btn">Upload</button>
+          <button type="submit" class="btn">Add Model</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Transfer Ownership Modal -->
+  <!-- Transfer Modal -->
   <div id="transfer-modal" class="modal">
     <div class="modal-content">
       <h2 class="modal-title">Transfer Ownership</h2>
@@ -315,16 +321,14 @@
       <div id="transfer-error" class="error-message" style="display: none;"></div>
       <form id="transfer-form">
         <div class="form-group">
-          <label for="target-wallet">Target Wallet Address:</label>
-          <input type="text" id="target-wallet" placeholder="Enter target wallet address" required>
+          <label for="target-wallet">New Owner Address:</label>
+          <input type="text" id="target-wallet" placeholder="Enter wallet address" required>
         </div>
         <div class="form-group">
           <label for="transfer-message">Message (Optional):</label>
-          <textarea id="transfer-message" placeholder="Add a message for the new owner" rows="3"></textarea>
+          <textarea id="transfer-message" placeholder="Add a note about this transfer" rows="3"></textarea>
         </div>
-        <!-- Hidden fields for item info -->
-        <input type="hidden" id="transfer-item-cid">
-        <input type="hidden" id="transfer-item-name">
+        <input type="hidden" id="transfer-item-id">
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
           <button type="submit" class="btn">Transfer</button>
@@ -333,7 +337,7 @@
     </div>
   </div>
 
-  <!-- View Modal with transaction history -->
+  <!-- View Modal -->
   <div id="view-modal" class="modal">
     <div class="modal-content" style="max-width: 800px; height: 80vh; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
       <span class="close-button" style="z-index: 10; color: white; text-shadow: 0 0 3px black;" onclick="closeViewModal()">&times;</span>
@@ -347,13 +351,13 @@
       </div>
       <div style="padding: 20px; background: white; overflow-y: auto;">
         <h2 id="detail-title">Model Title</h2>
-        <p id="detail-date" class="item-date">Created: </p>
+        <p id="detail-date" class="item-date">Added: </p>
         <p id="detail-owner" class="owner-info">Owned by: </p>
         <div id="model-format-info" style="font-size: 14px; color: #666; margin-bottom: 10px;"></div>
         <div id="detail-description" style="margin-bottom: 15px;"></div>
 
         <div class="transaction-history">
-          <h3 style="margin-bottom: 10px; text-align: left;">Transaction History</h3>
+          <h3 style="margin-bottom: 10px; text-align: left;">Ownership History</h3>
           <div id="transaction-list">
             <!-- Transactions will be populated here -->
           </div>
@@ -363,69 +367,100 @@
   </div>
 
   <script>
-    // Set your endpoints and JWT here
+    // Configuration
     const pinataJWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIwMTE2ZDMwNS1iZmRhLTQ5Y2YtYTVmMi0wMDM0ZGFhODJjNjgiLCJlbWFpbCI6ImdhZ2Vfd2VhdmVyQGt1LmVkdSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiIyZmQzNDkxZTQ2NmI5NGFkOWIxMCIsInNjb3BlZEtleVNlY3JldCI6ImE4NmRiZDM4NGM2MWYwMWNlMjI3MTYwZjA1YTA5NzAwMTM3MWU3NmE1YWQ1MDgxZTc3ZGFlNjkyNTNjZmUxY2QiLCJleHAiOjE3NzQ4NTE2NjB9.A-kRdbtlKNzWrwmz8XYwoNSGBWIrLZ4ljvqu_rWEa20";
     const PINATA_PUBLIC_URL = "https://api.pinata.cloud/v3/files/public";
     const PINATA_UPLOAD_URL = "https://uploads.pinata.cloud/v3/files";
     const conversionServiceURL = "http://localhost:6969/api/convert";
 
-    // Blockchain configuration
-    const contractAddress = "0x123..."; // Replace with your contract address
+    // Smart Contract Configuration (similar to your wall post example)
+    const contractAddress = "0xfC5296986351E629BF97Ad68714F9575a07B82A3"; // Replace with your contract address
     const contractABI = [
-      // ERC721 compatible interface
       {
-        "inputs": [
-          {"internalType": "string", "name": "name", "type": "string"},
-          {"internalType": "string", "name": "symbol", "type": "string"}
-        ],
+        "inputs": [],
         "stateMutability": "nonpayable",
         "type": "constructor"
       },
       {
         "anonymous": false,
         "inputs": [
-          {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
-          {"indexed": true, "internalType": "address", "name": "approved", "type": "address"},
-          {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
-        ],
-        "name": "Approval",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
-          {"indexed": true, "internalType": "address", "name": "operator", "type": "address"},
-          {"indexed": false, "internalType": "bool", "name": "approved", "type": "bool"}
-        ],
-        "name": "ApprovalForAll",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
           {"indexed": true, "internalType": "address", "name": "from", "type": "address"},
           {"indexed": true, "internalType": "address", "name": "to", "type": "address"},
-          {"indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256"}
+          {"indexed": false, "internalType": "uint256", "name": "modelId", "type": "uint256"},
+          {"indexed": false, "internalType": "string", "name": "message", "type": "string"},
+          {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
         ],
-        "name": "Transfer",
+        "name": "OwnershipTransferred",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+          {"indexed": false, "internalType": "uint256", "name": "modelId", "type": "uint256"},
+          {"indexed": false, "internalType": "string", "name": "ipfsHash", "type": "string"},
+          {"indexed": false, "internalType": "string", "name": "name", "type": "string"},
+          {"indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256"}
+        ],
+        "name": "ModelAdded",
         "type": "event"
       },
       {
         "inputs": [
-          {"internalType": "address", "name": "to", "type": "address"},
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
+          {"internalType": "string", "name": "ipfsHash", "type": "string"},
+          {"internalType": "string", "name": "name", "type": "string"},
+          {"internalType": "string", "name": "description", "type": "string"}
         ],
-        "name": "approve",
+        "name": "addModel",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
       },
       {
-        "inputs": [
-          {"internalType": "address", "name": "owner", "type": "address"}
+        "inputs": [],
+        "name": "getAllModels",
+        "outputs": [
+          {
+            "components": [
+              {"internalType": "uint256", "name": "id", "type": "uint256"},
+              {"internalType": "address", "name": "currentOwner", "type": "address"},
+              {"internalType": "string", "name": "ipfsHash", "type": "string"},
+              {"internalType": "string", "name": "name", "type": "string"},
+              {"internalType": "string", "name": "description", "type": "string"},
+              {"internalType": "uint256", "name": "createdAt", "type": "uint256"}
+            ],
+            "internalType": "struct ModelTracker.Model[]",
+            "name": "",
+            "type": "tuple[]"
+          }
         ],
-        "name": "balanceOf",
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {"internalType": "uint256", "name": "modelId", "type": "uint256"}
+        ],
+        "name": "getModelHistory",
+        "outputs": [
+          {
+            "components": [
+              {"internalType": "address", "name": "from", "type": "address"},
+              {"internalType": "address", "name": "to", "type": "address"},
+              {"internalType": "string", "name": "message", "type": "string"},
+              {"internalType": "uint256", "name": "timestamp", "type": "uint256"}
+            ],
+            "internalType": "struct ModelTracker.TransferRecord[]",
+            "name": "",
+            "type": "tuple[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "totalModels",
         "outputs": [
           {"internalType": "uint256", "name": "", "type": "uint256"}
         ],
@@ -434,169 +469,29 @@
       },
       {
         "inputs": [
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-        ],
-        "name": "getApproved",
-        "outputs": [
-          {"internalType": "address", "name": "", "type": "address"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "address", "name": "owner", "type": "address"},
-          {"internalType": "address", "name": "operator", "type": "address"}
-        ],
-        "name": "isApprovedForAll",
-        "outputs": [
-          {"internalType": "bool", "name": "", "type": "bool"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "name",
-        "outputs": [
-          {"internalType": "string", "name": "", "type": "string"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-        ],
-        "name": "ownerOf",
-        "outputs": [
-          {"internalType": "address", "name": "", "type": "address"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "address", "name": "from", "type": "address"},
-          {"internalType": "address", "name": "to", "type": "address"},
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-        ],
-        "name": "safeTransferFrom",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "address", "name": "from", "type": "address"},
-          {"internalType": "address", "name": "to", "type": "address"},
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
-          {"internalType": "bytes", "name": "data", "type": "bytes"}
-        ],
-        "name": "safeTransferFrom",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "address", "name": "operator", "type": "address"},
-          {"internalType": "bool", "name": "approved", "type": "bool"}
-        ],
-        "name": "setApprovalForAll",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "bytes4", "name": "interfaceId", "type": "bytes4"}
-        ],
-        "name": "supportsInterface",
-        "outputs": [
-          {"internalType": "bool", "name": "", "type": "bool"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "symbol",
-        "outputs": [
-          {"internalType": "string", "name": "", "type": "string"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-        ],
-        "name": "tokenURI",
-        "outputs": [
-          {"internalType": "string", "name": "", "type": "string"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "address", "name": "from", "type": "address"},
-          {"internalType": "address", "name": "to", "type": "address"},
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-        ],
-        "name": "transferFrom",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      // Custom functions for our 3D model tracking
-      {
-        "inputs": [
-          {"internalType": "string", "name": "ipfsHash", "type": "string"},
-          {"internalType": "string", "name": "name", "type": "string"},
-          {"internalType": "string", "name": "description", "type": "string"}
-        ],
-        "name": "mintModel",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"},
+          {"internalType": "uint256", "name": "modelId", "type": "uint256"},
           {"internalType": "address", "name": "newOwner", "type": "address"},
           {"internalType": "string", "name": "message", "type": "string"}
         ],
-        "name": "transferModelOwnership",
+        "name": "transferOwnership",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
-      },
-      {
-        "inputs": [
-          {"internalType": "uint256", "name": "tokenId", "type": "uint256"}
-        ],
-        "name": "getModelHistory",
-        "outputs": [
-          {"components": [
-            {"internalType": "address", "name": "from", "type": "address"},
-            {"internalType": "address", "name": "to", "type": "address"},
-            {"internalType": "uint256", "name": "timestamp", "type": "uint256"},
-            {"internalType": "string", "name": "message", "type": "string"}
-          ], "internalType": "struct ModelTracker.TransferRecord[]", "name": "", "type": "tuple[]"}
-        ],
-        "stateMutability": "view",
-        "type": "function"
       }
+    ];
+
+    // Admin addresses (for demo purposes)
+    const ADMIN_ADDRESSES = [
+      "0xYourAdminAddress1",
+      "0xYourAdminAddress2"
     ];
 
     // Global state
     let walletClient;
     let publicClient;
-    let account = "";
     let contract;
-    let inventory = [];
+    let account = "";
+    let isAdmin = false;
 
     // Initialize the app
     document.addEventListener('DOMContentLoaded', async () => {
@@ -610,7 +505,6 @@
         transferOwnership();
       });
 
-      // Load inventory from both IPFS and blockchain
       await fetchInventoryItems();
     });
 
@@ -632,10 +526,17 @@
         const [address] = await window.ethereum.request({ method: 'eth_requestAccounts' });
         account = address;
 
+        // Check if admin
+        isAdmin = ADMIN_ADDRESSES.includes(address.toLowerCase());
+
         // Update UI
         document.getElementById('wallet-button').textContent =
-          `${address.slice(0, 6)}...${address.slice(-4)}`;
-        document.getElementById('add-button').style.display = 'flex';
+          `${address.slice(0, 6)}...${address.slice(-4)}${isAdmin ? ' <span class="admin-badge">ADMIN</span>' : ''}`;
+
+        // Show add button if admin
+        if (isAdmin) {
+          document.getElementById('add-button').style.display = 'flex';
+        }
 
         // Initialize clients
         walletClient = viem.createWalletClient({
@@ -654,11 +555,11 @@
           publicClient
         });
 
-        // Refresh inventory with ownership data
+        // Refresh inventory
         await fetchInventoryItems();
       } catch (error) {
         console.error('Error connecting wallet:', error);
-        showError('wallet-button', 'Failed to connect wallet');
+        showError('wallet-button', 'Loading...');
       }
     }
 
@@ -668,221 +569,232 @@
       const originalText = element.textContent;
       const originalColor = element.style.backgroundColor;
 
-      element.textContent = message;
+      element.innerHTML = message;
       element.style.backgroundColor = '#ff4444';
 
       setTimeout(() => {
-        element.textContent = originalText;
+        element.innerHTML = originalText;
         element.style.backgroundColor = originalColor;
       }, 3000);
     }
 
     // Fetch inventory items from IPFS and blockchain
-    async function fetchInventoryItems() {
+  async function fetchInventoryItems() {
+  try {
+    document.getElementById('inventory-loading').style.display = 'flex';
+    document.getElementById('inventory-container').style.display = 'none';
+
+    let models = [];
+    if (contract) {
       try {
-        // Show loading state
-        document.getElementById('inventory-loading').style.display = 'flex';
-        document.getElementById('inventory-container').style.display = 'none';
-
-        // Fetch from IPFS
-        const response = await fetch(PINATA_PUBLIC_URL, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${pinataJWT}` }
-        });
-
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
-        const data = await response.json();
-        const modelFiles = data.data.files.filter(file =>
-          file.name.toLowerCase().endsWith('.glb') ||
-          file.name.toLowerCase().endsWith('.gltf') ||
-          file.name.toLowerCase().endsWith('.usdz')
-        );
-
-        // If wallet is connected, fetch ownership data
-        if (account && contract) {
-          // Get all token IDs owned by this account
-          const balance = await contract.read.balanceOf([account]);
-          const tokenIds = [];
-
-          for (let i = 0; i < balance; i++) {
-            const tokenId = await contract.read.tokenOfOwnerByIndex([account, i]);
-            tokenIds.push(tokenId);
-          }
-
-          // Get metadata for each token
-          const tokenMetadata = await Promise.all(
-            tokenIds.map(async (tokenId) => {
-              const uri = await contract.read.tokenURI([tokenId]);
-              // Assuming URI is IPFS hash
-              const metadataResponse = await fetch(`https://gateway.pinata.cloud/ipfs/${uri.replace('ipfs://', '')}`);
-              return metadataResponse.json();
-            })
-          );
-
-          // Merge IPFS files with blockchain data
-          inventory = modelFiles.map(file => {
-            const metadata = tokenMetadata.find(m => m.ipfsHash === file.cid);
-            return {
-              ...file,
-              ownedByUser: metadata && metadata.owner === account,
-              owner: metadata ? metadata.owner : 'Unknown',
-              tokenId: metadata ? metadata.tokenId : null,
-              name: metadata ? metadata.name : file.name.split('.')[0],
-              description: metadata ? metadata.description : ''
-            };
-          });
-        } else {
-          // No wallet connected, just show public inventory
-          inventory = modelFiles.map(file => ({
-            ...file,
-            ownedByUser: false,
-            owner: 'Unknown',
-            tokenId: null,
-            name: file.name.split('.')[0],
-            description: ''
-          }));
-        }
-
-        renderInventoryItems(inventory);
-        document.getElementById('inventory-loading').style.display = 'none';
-        document.getElementById('inventory-container').style.display = 'flex';
+        models = await contract.read.getAllModels();
+        console.log('Blockchain models:', models); // Debug log
       } catch (error) {
-        console.error('Error fetching inventory items:', error);
-        document.getElementById('inventory-loading').innerHTML =
-          `<p>Error loading inventory. Please try again later.<br>${error.message}</p>`;
+        console.error('Error fetching from blockchain:', error);
       }
     }
 
-    // Check if file is web compatible
-    function isWebCompatible(filename) {
-      return filename.toLowerCase().endsWith('.glb') || filename.toLowerCase().endsWith('.gltf');
+    try {
+      const response = await fetch(PINATA_PUBLIC_URL, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${pinataJWT}` }
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+      const data = await response.json();
+      console.log('IPFS files:', data); // Debug log
+
+      const modelFiles = data.data.files.filter(file =>
+        file.name.toLowerCase().endsWith('.glb') ||
+        file.name.toLowerCase().endsWith('.gltf') ||
+        file.name.toLowerCase().endsWith('.usdz')
+      );
+
+      // Merge data
+      const inventory = modelFiles.map(file => {
+        const modelData = models.find(m => m.ipfsHash === file.cid);
+        return {
+          ...file,
+          name: modelData ? modelData.name : file.name.split('.')[1],
+          description: modelData ? modelData.description : '',
+          owner: modelData ? modelData.currentOwner : 'Unknown',
+          createdAt: modelData ? new Date(Number(modelData.createdAt) * 1000) : new Date(file.created_at),
+          modelId: modelData ? modelData.id : null
+        };
+      });
+
+      console.log('Merged inventory:', inventory); // Debug log
+      renderInventoryItems(inventory);
+
+    } catch (ipfsError) {
+      console.error('IPFS fetch error:', ipfsError);
+      // Fallback to just blockchain data if IPFS fails
+      if (models.length > 0) {
+        const inventory = models.map(model => ({
+          cid: model.ipfsHash,
+          name: model.name,
+          description: model.description,
+          owner: model.currentOwner,
+          createdAt: new Date(Number(model.createdAt) * 1000),
+          modelId: model.id
+        }));
+        renderInventoryItems(inventory);
+      }
     }
+
+    document.getElementById('inventory-loading').style.display = 'none';
+    document.getElementById('inventory-container').style.display = 'flex';
+
+  } catch (error) {
+    console.error('Error fetching inventory:', error);
+    document.getElementById('inventory-loading').innerHTML =
+      `<p>Error loading inventory. Please try again later.<br>${error.message}</p>`;
+  }
+}
+    // Check if file is web compatible
+function isWebCompatible(filename) {
+  if (!filename) return false;
+
+  // Convert to lowercase and check for extensions
+  const lowerName = filename.toLowerCase();
+  return lowerName.endsWith('.glb') || lowerName.endsWith('.gltf');
+}
 
     // Get file format
-    function getFileFormat(filename) {
-      const parts = filename.split('.');
-      return parts[parts.length - 1].toUpperCase();
-    }
+ function getFileFormat(filename) {
+  // Handle cases where filename might not have an extension
+  if (!filename) return 'UNKNOWN';
+
+  const parts = filename.split('.');
+  // If no extension, return the filename in uppercase
+  if (parts.length === 1) return filename.toUpperCase();
+
+  // Return the extension in uppercase
+  return parts[parts.length - 1].toUpperCase();
+}
 
     // Render inventory items
-    function renderInventoryItems(items) {
-      const container = document.getElementById('inventory-container');
-      container.innerHTML = '';
+ function renderInventoryItems(items) {
+  console.log("Entered renderInventoryItems with items:", items);
+  const container = document.getElementById('inventory-container');
+  container.innerHTML = '';
 
-      if (items.length === 0) {
-        container.innerHTML = '<p>No 3D models found. Connect your wallet and upload your first model!</p>';
-        return;
-      }
+  if (items.length === 0) {
+    console.log("No items found");
+    container.innerHTML = '<p>No 3D models found.</p>';
+    return;
+  }
 
-      items.forEach(item => {
-        const createdDate = new Date(item.created_at);
-        const formattedDate = createdDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-        const fileFormat = getFileFormat(item.name);
-        const card = document.createElement('div');
-        card.className = 'item-card';
 
-        if (isWebCompatible(item.name)) {
-          card.innerHTML = `
-            <div class="model-container">
-              <model-viewer
-                src="https://gateway.pinata.cloud/ipfs/${item.cid}"
-                alt="${item.name}"
-                camera-controls
-                auto-rotate
-                data-cid="${item.cid}"
-                data-name="${item.name}"
-                data-date="${formattedDate}"
-                data-format="${fileFormat}">
-              </model-viewer>
-            </div>
-            <div class="item-info">
-              <h3>${item.name}</h3>
-              <div class="item-date">Created: ${formattedDate}</div>
-              <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
-              <div class="btn-group">
-                <button class="btn" onclick="viewModel('https://gateway.pinata.cloud/ipfs/${item.cid}',
-                  '${item.name}', '${formattedDate}', '${fileFormat}', true,
-                  '${item.owner}', '${item.description}', '${item.tokenId}')">
-                  View Details
-                </button>
-                ${item.ownedByUser ? `
-                <button class="btn" onclick="openTransferModal('${item.cid}', '${item.name}', '${item.tokenId}')">
-                  Transfer
-                </button>` : ''}
-              </div>
-            </div>
-          `;
-          container.appendChild(card);
-        } else if (item.name.toLowerCase().endsWith('.usdz')) {
-          card.innerHTML = `
-            <div class="model-container">
-              <div class="placeholder-model" data-cid="${item.cid}">
-                <div>
-                  <div class="spinner" style="margin-bottom:10px;"></div>
-                  <div>Converting USDZ to GLB...</div>
-                </div>
-              </div>
-            </div>
-            <div class="item-info">
-              <h3>${item.name}</h3>
-              <div class="item-date">Created: ${formattedDate}</div>
-              <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
-            </div>
-          `;
-          container.appendChild(card);
 
-          convertUSDZFile(item.cid, item.name).then(convertedURL => {
-            card.innerHTML = `
-              <div class="model-container">
-                <model-viewer
-                  src="${convertedURL}"
-                  alt="${item.name}"
-                  camera-controls
-                  auto-rotate
-                  data-cid="${item.cid}"
-                  data-name="${item.name}"
-                  data-date="${formattedDate}"
-                  data-format="GLB">
-                </model-viewer>
-              </div>
-              <div class="item-info">
-                <h3>${item.name}</h3>
-                <div class="item-date">Created: ${formattedDate}</div>
-                <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
-                <div class="btn-group">
-                  <button class="btn" onclick="viewModel('${convertedURL}',
-                    '${item.name}', '${formattedDate}', 'GLB', true,
-                    '${item.owner}', '${item.description}', '${item.tokenId}')">
-                    View Details
-                  </button>
-                  ${item.ownedByUser ? `
-                  <button class="btn" onclick="openTransferModal('${item.cid}', '${item.name}', '${item.tokenId}')">
-                    Transfer
-                  </button>` : ''}
-                </div>
-              </div>
-            `;
-          }).catch(error => {
-            card.innerHTML = `
-              <div class="model-container">
-                <div class="placeholder-model">
-                  <div style="color: red;">Conversion Error</div>
-                </div>
-              </div>
-              <div class="item-info">
-                <h3>${item.name}</h3>
-                <div class="item-date">Created: ${formattedDate}</div>
-                <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
-              </div>
-            `;
-            console.error('Error converting USDZ:', error);
-          });
-        }
+  items.forEach(item => {
+  console.log("Processing item:", item);
+  const formattedDate = item.createdAt.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+  const fileFormat = getFileFormat(item.name);
+  console.log(`File format: ${fileFormat} for ${item.name}`);
+
+  const card = document.createElement('div');
+  card.className = 'item-card';
+
+  if (isWebCompatible(item.name)) {
+    console.log(`Web compatible file: ${item.name}`);
+    card.innerHTML = `
+      <div class="model-container">
+        <model-viewer
+          src="https://gateway.pinata.cloud/ipfs/${item.cid}"
+          alt="${item.name}"
+          camera-controls
+          auto-rotate
+          data-cid="${item.cid}"
+          data-name="${item.name}"
+          data-date="${formattedDate}"
+          data-format="${fileFormat}">
+        </model-viewer>
+      </div>
+      <div class="item-info">
+        <h3>${item.name.split('.')[0]}</h3>
+        <div class="item-date">Added: ${formattedDate}</div>
+        <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button class="btn" onclick="viewModel('https://gateway.pinata.cloud/ipfs/${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', '${fileFormat}', true)">View Details</button>
+          <button class="btn" onclick="openTransferModal('${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', '${fileFormat}')">Transfer</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  } else {
+    console.log(`USDZ file detected: ${item.name}, attempting conversion`);
+    card.innerHTML = `
+      <div class="model-container">
+        <div class="placeholder-model" data-cid="${item.cid}">
+          <div>
+            <div class="spinner" style="margin-bottom:10px;"></div>
+            <div>Converting USDZ to GLB...</div>
+          </div>
+        </div>
+      </div>
+      <div class="item-info">
+        <h3>${item.name.split('.')[0]}</h3>
+        <div class="item-date">Added: ${formattedDate}</div>
+        <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
+      </div>
+    `;
+    console.log
+    container.appendChild(card);
+
+    console.log(`Calling convertUSDZFile for CID: ${item.cid}`);
+    convertUSDZFile(item.cid, item.name)
+      .then(convertedURL => {
+        console.log(`Conversion successful, URL: ${convertedURL}`);
+        card.innerHTML = `
+          <div class="model-container">
+            <model-viewer
+              src="${convertedURL}"
+              alt="${item.name}"
+              camera-controls
+              auto-rotate
+              data-cid="${item.cid}"
+              data-name="${item.name}"
+              data-date="${formattedDate}"
+              data-format="GLB">
+            </model-viewer>
+          </div>
+          <div class="item-info">
+            <h3>${item.name.split('.')[0]}</h3>
+            <div class="item-date">Added: ${formattedDate}</div>
+            <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+              <button class="btn" onclick="viewModel('${convertedURL}', '${item.name.split('.')[0]}', '${formattedDate}', 'GLB', true)">View Details</button>
+              <button class="btn" onclick="openTransferModal('${item.cid}', '${item.name.split('.')[0]}', '${formattedDate}', 'GLB')">Transfer</button>
+            </div>
+          </div>
+        `;
+      })
+      .catch(error => {
+        console.error('Error converting USDZ:', error);
+        card.innerHTML = `
+          <div class="model-container">
+            <div class="placeholder-model">
+              <div style="color: red;">Conversion Error</div>
+            </div>
+          </div>
+          <div class="item-info">
+            <h3>${item.name.split('.')[0]}</h3>
+            <div class="item-date">Added: ${formattedDate}</div>
+            <div class="owner-info">Owned by: ${item.owner.slice(0, 6)}...${item.owner.slice(-4)}</div>
+          </div>
+        `;
       });
-    }
+  }
+});
 
-    // Upload model to IPFS and mint NFT
+}
+    // Upload model to IPFS and add to blockchain
     async function uploadModel() {
       const fileInput = document.getElementById('model-file');
       const nameInput = document.getElementById('model-name');
@@ -918,33 +830,9 @@
         const uploadData = await uploadResponse.json();
         const ipfsHash = uploadData.IpfsHash;
 
-        // Create metadata JSON
-        const metadata = {
-          name,
-          description,
-          image: `https://gateway.pinata.cloud/ipfs/${ipfsHash}`,
+        // Add to blockchain
+        await contract.write.addModel([
           ipfsHash,
-          created_at: new Date().toISOString()
-        };
-
-        // Upload metadata to IPFS
-        const metadataResponse = await fetch(PINATA_UPLOAD_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${pinataJWT}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(metadata)
-        });
-
-        if (!metadataResponse.ok) throw new Error('Failed to upload metadata');
-
-        const metadataData = await metadataResponse.json();
-        const metadataHash = metadataData.IpfsHash;
-
-        // Mint NFT with metadata
-        await contract.write.mintModel([
-          metadataHash,
           name,
           description
         ]);
@@ -963,11 +851,10 @@
     async function transferOwnership() {
       const targetWallet = document.getElementById('target-wallet').value;
       const message = document.getElementById('transfer-message').value;
-      const itemCid = document.getElementById('transfer-item-cid').value;
-      const tokenId = document.getElementById('transfer-item-name').value; // Actually tokenId in this case
+      const modelId = document.getElementById('transfer-item-id').value;
       const errorElement = document.getElementById('transfer-error');
 
-      if (!targetWallet || !tokenId) {
+      if (!targetWallet || !modelId) {
         errorElement.textContent = 'Invalid transfer data';
         errorElement.style.display = 'block';
         return;
@@ -977,8 +864,8 @@
         errorElement.style.display = 'none';
 
         // Call the contract to transfer ownership
-        await contract.write.transferModelOwnership([
-          tokenId,
+        await contract.write.transferOwnership([
+          modelId,
           targetWallet,
           message || ""
         ]);
@@ -994,7 +881,7 @@
     }
 
     // View model details with transaction history
-    async function viewModel(modelSrc, name, date, format, isCompatible, owner, description, tokenId) {
+    async function viewModel(modelSrc, name, date, format, isCompatible, owner, description, modelId) {
       const modelViewer = document.getElementById('detail-model-viewer');
       const formatInfo = document.getElementById('model-format-info');
       const transactionList = document.getElementById('transaction-list');
@@ -1016,35 +903,35 @@
       }
 
       document.getElementById('detail-title').textContent = name;
-      document.getElementById('detail-date').textContent = `Created: ${date}`;
+      document.getElementById('detail-date').textContent = `Added: ${date}`;
       document.getElementById('detail-owner').textContent = `Owned by: ${owner.slice(0, 6)}...${owner.slice(-4)}`;
       document.getElementById('detail-description').textContent = description || 'No description provided';
 
-      // Load transaction history if tokenId exists
+      // Load transaction history if modelId exists
       transactionList.innerHTML = '<div class="loading"><div class="spinner"></div><span>Loading history...</span></div>';
 
-      if (tokenId && contract) {
+      if (modelId && contract) {
         try {
-          const history = await contract.read.getModelHistory([tokenId]);
+          const history = await contract.read.getModelHistory([modelId]);
 
           if (history.length === 0) {
-            transactionList.innerHTML = '<div class="transaction-item">No transaction history found</div>';
+            transactionList.innerHTML = '<div class="transaction-item">No ownership history found</div>';
           } else {
             transactionList.innerHTML = history.map(tx => `
               <div class="transaction-item">
                 <strong>From:</strong> ${tx.from.slice(0, 6)}...${tx.from.slice(-4)}<br>
                 <strong>To:</strong> ${tx.to.slice(0, 6)}...${tx.to.slice(-4)}<br>
                 <strong>Date:</strong> ${new Date(Number(tx.timestamp) * 1000).toLocaleString()}<br>
-                ${tx.message ? `<strong>Message:</strong> ${tx.message}<br>` : ''}
+                ${tx.message ? `<strong>Note:</strong> ${tx.message}<br>` : ''}
               </div>
             `).join('');
           }
         } catch (error) {
           console.error('Error loading transaction history:', error);
-          transactionList.innerHTML = '<div class="transaction-item">Error loading transaction history</div>';
+          transactionList.innerHTML = '<div class="transaction-item">Error loading ownership history</div>';
         }
       } else {
-        transactionList.innerHTML = '<div class="transaction-item">No transaction history available</div>';
+        transactionList.innerHTML = '<div class="transaction-item">No blockchain record found</div>';
       }
 
       document.getElementById('view-modal').style.display = 'flex';
@@ -1061,9 +948,8 @@
       document.getElementById('upload-error').style.display = 'none';
     }
 
-    function openTransferModal(cid, name, tokenId) {
-      document.getElementById('transfer-item-cid').value = cid;
-      document.getElementById('transfer-item-name').value = tokenId;
+    function openTransferModal(modelId, name) {
+      document.getElementById('transfer-item-id').value = modelId;
       document.getElementById('transfer-modal').style.display = 'flex';
     }
 
@@ -1078,24 +964,52 @@
     }
 
     // USDZ conversion function
-    async function convertUSDZFile(cid, filename) {
-      const response = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
-      if (!response.ok) throw new Error("Failed to fetch USDZ file.");
-      const usdzBlob = await response.blob();
-      const usdzFile = new File([usdzBlob], filename, { type: 'model/vnd.usdz+zip' });
-      const formData = new FormData();
-      formData.append('file', usdzFile);
-      const convResponse = await fetch(conversionServiceURL, {
-        method: 'POST',
-        body: formData
-      });
-      if (!convResponse.ok) {
-        const errorData = await convResponse.json();
-        throw new Error(`Conversion failed: ${errorData.error || convResponse.statusText}`);
-      }
-      const convertedBlob = await convResponse.blob();
-      return URL.createObjectURL(convertedBlob);
+async function convertUSDZFile(cid, filename) {
+  console.log(`Starting conversion for ${filename} (CID: ${cid})`);
+
+  try {
+    // 1. First fetch the USDZ file from IPFS
+    const ipfsUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
+    console.log(`Fetching from IPFS: ${ipfsUrl}`);
+
+    const response = await fetch(ipfsUrl);
+    if (!response.ok) {
+      throw new Error(`IPFS fetch failed with status ${response.status}`);
     }
+
+    console.log(`Successfully fetched USDZ file`);
+    const usdzBlob = await response.blob();
+    const usdzFile = new File([usdzBlob], filename, { type: 'model/vnd.usdz+zip' });
+
+    // 2. Prepare form data for conversion
+    const formData = new FormData();
+    formData.append('file', usdzFile);
+    console.log(`Prepared form data for conversion`);
+
+    // 3. Try local conversion service
+    console.log(`Attempting conversion via ${conversionServiceURL}`);
+    const convResponse = await fetch(conversionServiceURL, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!convResponse.ok) {
+      const errorText = await convResponse.text();
+      throw new Error(`Conversion failed: ${errorText}`);
+    }
+
+    console.log(`Conversion successful`);
+    const convertedBlob = await convResponse.blob();
+    const objectUrl = URL.createObjectURL(convertedBlob);
+    console.log(`Created object URL: ${objectUrl}`);
+
+    return objectUrl;
+
+  } catch (error) {
+    console.error('Error in convertUSDZFile:', error);
+    throw error; // Re-throw to be caught by the caller
+  }
+}
   </script>
 </body>
 </html>
